@@ -97,6 +97,8 @@ def dirty_vault(source: str | None = Query(default=None)) -> dict[str, object]:
         "count": len(records),
         "records": [
             {"id": r.record_id, "batch": r.batch_ref, "reason": r.reason,
+             "record_key": r.record_key, "status": r.effective_status,
+             "recovered_at": r.recovered_at,
              "raw": r.raw_data, "detected_at": r.detected_at}
             for r in records
         ],
@@ -117,6 +119,7 @@ def collect_records(batch_ref: str | None = Query(default=None),
         "count": len(records),
         "records": [
             {"id": e.entry_id, "batch": e.batch_ref, "fields": e.fields,
+             "record_key": e.record_key, "process_state": e.process_state,
              "validated": e.validated, "score": e.quality_score}
             for e in records
         ],

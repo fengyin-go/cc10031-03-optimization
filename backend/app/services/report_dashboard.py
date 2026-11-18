@@ -60,7 +60,39 @@ class ReportDashboardService(BaseModuleService):
             "platform_health": "正常" if task_failed < task_completed / 2 else "下降",
         }
 
+    def quality_summary(self) -> dict[str, Any]:
+        """质量汇总：核对采集质量谱系数据集。
+
+        按恢复状态区分当前问题与历史隔离：
+        - 当前问题：隔离区仍有效的记录（隔离中）；
+        - 历史隔离：已恢复 / 已被更正取代的记录；
+        并保留一份隔离原因明细，核对谱系与隔离区计数一致。
+        """
+        from app.services.result_verify import ResultVerifyService
+
+        lineage = ResultVerifyService().quality_lineage()
+        vault = store.dirty_vault.snapshot()
+
+        current = [row for row in lineage if row["status"] == "已隔离"]
+        historical = [row for row in lineage if row["status"] in ("已恢复", "已更正")]
+        reason_details = vault["reason_details"]
+
+        # 核对：谱系当前问题数必须等于隔离区当前有效数（每键一条有效原因）
+        reconciled = len(current) == vault["quarantined"]
+
+        return {
+            "lineage_total": len(lineage),
+            "current_issues": len(current),
+            "historical_quarantine": len(historical),
+            "recovered": sum(1 for row in lineage if row["status"] == "已恢复"),
+            "corrected": sum(1 for row in lineage if row["status"] == "已更正"),
+            "reason_details": reason_details,
+            "vault_quarantined": vault["quarantined"],
+            "vault_recovered": vault["recovered"],
+            "reconciled": reconciled,
+        }
+
     def domain_snapshot(self) -> dict[str, Any]:
         base = super().domain_snapshot()
         agg = self.aggregate_platform_stats()
-        return {**base, **agg}
+        return {**base, **agg, "quality_summary": self.quality_summary()}

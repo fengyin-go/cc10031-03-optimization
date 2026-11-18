@@ -147,11 +147,14 @@ class DataExtractService(BaseModuleService):
                 if reason == "字段缺失":
                     del record[random.choice(list(record.keys()))]
 
+                # 按记录键去重写入隔离区：同一批次重跑不会重复隔离；
+                # 解析失败的脏数据使用独立键空间，避免与采集记录键碰撞
                 store.dirty_vault.quarantine(
                     source=self.MODULE,
                     batch_ref=batch_ref,
                     raw_data=dict(record),
                     reason=reason,
+                    record_key=f"{batch_ref}#dirty-{record.get('_seq', i + 1)}",
                 )
                 dirty_records.append(record)
             else:

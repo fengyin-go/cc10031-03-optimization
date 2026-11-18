@@ -11,11 +11,14 @@
 .
 ├── frontend/                 Vue 3 + Vite + TypeScript 前端
 │   ├── src/views/WorkbenchView.vue|tsx  全部模块共享工作台
+│   ├── src/views/QualityWorkbenchView.vue  质量工作台（采集质量谱系）
+│   ├── src/domain/quality.ts              质量谱系领域模型与判定逻辑
 │   ├── src/data/modules.ts              18个业务模块配置
 │   ├── src/api/              统一请求封装
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/quality.py   质量工作台接口（/api/quality/*）
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
 │   ├── app/services/base.py     共享服务骨架
 │   └── app/store.py          内存数据仓库与示例数据
@@ -78,6 +81,25 @@ npm run dev
   `frontend/src/domain/<模块>.ts`，用于承载真实业务差异并维持36题位容量。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 质量工作台（采集质量谱系）
+
+采集校验链路的隔离与恢复稳定性约定，入口为前端「质量工作台」(`/quality`)：
+
+- 结果校验只消费**尚未验证**的采集记录；校验失败写入隔离区的同时，
+  采集记录处理状态与隔离回执同步推进（待校验 → 已隔离），
+  失败记录重跑不会重复写入隔离区。
+- 隔离区按**记录键**去重：同一记录键只保留一条当前有效隔离原因；
+  恢复后的记录键不会再次进入同一隔离批次，不重复累计同一隔离原因。
+- 批量恢复只更新仍处于当前隔离状态的记录，并发重复提交只算一次；
+  恢复后采集记录状态同步推进为已恢复。
+- 原始记录更正与隔离回执同时到达时，可按更正重建当前隔离清单（rebuild），
+  或追加重算事件并延迟发布汇总（recalc_event）；两套边界都只保留一条有效隔离原因。
+- 谱系数据集按记录键去重且脱敏（不输出原始字段值）；
+  质量汇总按恢复状态区分当前问题与历史隔离，并保留一份隔离原因明细。
+
+接口：`GET /api/quality/lineage`、`GET /api/quality/record?key=`、
+`GET /api/quality/summary`、`POST /api/quality/recover`、`POST /api/quality/correct`。
 
 领域：数据工程
 子方向：数据采集、爬虫与RPA

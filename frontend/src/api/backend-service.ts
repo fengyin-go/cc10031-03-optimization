@@ -106,3 +106,49 @@ export async function loadRecoveryStats(): Promise<Record<string, unknown>> {
   if (!response.ok) throw new Error('恢复状态查询失败')
   return await response.json()
 }
+
+/** 质量工作台：去重后的采集质量谱系数据集（脱敏） */
+export async function loadQualityLineage(batchRef?: string): Promise<Record<string, unknown>> {
+  const query = batchRef ? `?batch_ref=${encodeURIComponent(batchRef)}` : ''
+  const response = await request(`/api/quality/lineage${query}`)
+  if (!response.ok) throw new Error('质量谱系读取失败')
+  return await response.json()
+}
+
+/** 质量工作台：按记录键查看当前隔离原因、恢复时间和历史重算记录 */
+export async function loadQualityRecord(recordKey: string): Promise<Record<string, unknown>> {
+  const response = await request(`/api/quality/record?key=${encodeURIComponent(recordKey)}`)
+  if (!response.ok) throw new Error('记录键详情读取失败')
+  return await response.json()
+}
+
+/** 质量工作台：质量汇总（当前问题 / 历史隔离 / 隔离原因明细） */
+export async function loadQualitySummary(): Promise<Record<string, unknown>> {
+  const response = await request('/api/quality/summary')
+  if (!response.ok) throw new Error('质量汇总读取失败')
+  return await response.json()
+}
+
+/** 质量工作台：批量恢复（只更新当前状态记录，重复提交只算一次） */
+export async function recoverQualityRecords(recordKeys: string[]): Promise<Record<string, unknown>> {
+  const response = await request('/api/quality/recover', {
+    method: 'POST',
+    body: JSON.stringify({ record_keys: recordKeys }),
+  })
+  if (!response.ok) throw new Error('批量恢复失败')
+  return await response.json()
+}
+
+/** 质量工作台：原始记录更正（rebuild 重建 / recalc_event 追加重算事件） */
+export async function correctQualityRecord(
+  recordKey: string,
+  correctedFields: Record<string, unknown>,
+  mode: 'rebuild' | 'recalc_event',
+): Promise<Record<string, unknown>> {
+  const response = await request('/api/quality/correct', {
+    method: 'POST',
+    body: JSON.stringify({ record_key: recordKey, corrected_fields: correctedFields, mode }),
+  })
+  if (!response.ok) throw new Error('记录更正失败')
+  return await response.json()
+}
